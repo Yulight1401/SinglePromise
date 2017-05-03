@@ -1,12 +1,20 @@
+/**
+ * MPromise - Description
+ *
+ * @param {type} func Description
+ *
+ * @return {type} Description
+ */
 function MPromise (func) {
 	this.val
 	this.stats = 'loading'
-	this.resolveFunc = function () {}
-	this.rejectFunc = function () {}
+	this.resolveFunc = [] //是一个作业队列，用于多次绑定then时
+	this.rejectFunc = []
 	this.catchFunc = function () {}
 	var self = this
 	try {
-		func(this.resolve.bind(this), this.reject.bind(this)) //需要将MPromise的作用域绑定
+		func(this.resolve.bind(this), this.reject.bind(this))
+		//需要将MPromise的作用域绑定
 	} catch (e) {
 		setTimeout(function () {
 			self.catchFunc(e)
@@ -15,6 +23,14 @@ function MPromise (func) {
 
 	}
 }
+
+/**
+ * all - Description
+ *
+ * @param {type} funcArray Description
+ *
+ * @return {type} Description
+ */
 MPromise.all = function (funcArray) {
 	var result = []
 	return new MPromise(function (res, rej) {
@@ -34,6 +50,14 @@ MPromise.all = function (funcArray) {
 		})
 	})
 }
+
+/**
+ * race - Description
+ *
+ * @param {type} funcArray Description
+ *
+ * @return {type} Description
+ */
 MPromise.race = function (funcArray) {
 	return new MPromise(function (res, rej) {
 		funcArray.map(function (func) {
@@ -45,26 +69,55 @@ MPromise.race = function (funcArray) {
 		})
 	})
 }
+
+/**
+ * resolve - Description
+ *
+ * @param {type} val Description
+ *
+ * @return {type} Description
+ */
 MPromise.prototype.resolve = function (val) {
 	var self = this
 	self.val = val
 	if (self.stats === 'loading') {
 		self.stats = 'resolved'
-		setTimeout(function () { //确保绑定回调函数之后，再执行方法,在链式回调中，确保全部执行，将他们放入队列中
-			self.resolveFunc(self.val)
+		setTimeout(function () {
+			//确保绑定回调函数之后，再执行方法,在链式回调中，确保全部执行，将他们放入队列中
+			self.resolveFunc.map(function (func) {
+				func(self.val)
+			})
 		}, 0)
 	}
 }
+
+/**
+ * reject - Description
+ *
+ * @param {type} val Description
+ *
+ * @return {type} Description
+ */
 MPromise.prototype.reject = function (val) {
 	var self = this
 	self.val = val
 	if (self.stats === 'loading') {
 		self.stats = 'rejected'
 		setTimeout(function () {
-			self.rejectFunc(self.val)
+			self.rejectFunc.map(function (func) {
+				func(self.val)
+			})
 		}, 0)
 	}
 }
+
+/**
+ * catch - Description
+ *
+ * @param {type} catchFunc Description
+ *
+ * @return {type} Description
+ */
 MPromise.prototype.catch = function (catchFunc) {
 	var self = this
 	return new MPromise(function (res, rej) {
@@ -72,6 +125,15 @@ MPromise.prototype.catch = function (catchFunc) {
 		rej()
 	})
 }
+
+/**
+ * then - Description
+ *
+ * @param {type} resolveFunc Description
+ * @param {type} rejectFunc  Description
+ *
+ * @return {type} Description
+ */
 MPromise.prototype.then = function (resolveFunc, rejectFunc) {
 	var self = this
 	return new MPromise(function (res, rej) { //返回新的Promise对象，并且传递val
@@ -92,8 +154,8 @@ MPromise.prototype.then = function (resolveFunc, rejectFunc) {
         rej(result)
       }
     }
-		self.resolveFunc = resolveFuncWrap //绑定then中的回调函数
-		self.rejectFunc = rejectFuncWrap
+		self.resolveFunc.push(resolveFuncWrap) //绑定then中的回调函数
+		self.rejectFunc.push(rejectFuncWrap)
 	})
 }
 
@@ -102,7 +164,7 @@ MPromise.prototype.then = function (resolveFunc, rejectFunc) {
 var fn = function (resolve, reject) {
   console.log('begin to execute!')
   var number = Math.random()
-  if (number <= 0.9) {
+  if (number <= 0.5) {
 		setTimeout(function () {
 			resolve('less than ' + 1000*number)
 		}, 1000*number)
@@ -110,6 +172,7 @@ var fn = function (resolve, reject) {
     reject('greater than 0.5')
   }
 }
+
 
 var fn2 = function (resolve, reject) {
 	resolve()
@@ -120,14 +183,26 @@ var p = new MPromise(fn)
 var p2 = new MPromise(fn)
 var p3 = new MPromise(fn)
 var p4 = new MPromise(fn2)
+var p5 = new Promise(fn)
 
-p4.catch(function (e) {
-	console.log(e)
-}).then(function () {
-	console.log('not reject')
-},function () {
-	console.log('isrejected')
+p.then(function (data) {
+	console.log('1',data)
+}, function (data) {
+	console.log('1',data)
 })
+
+p.then(function (data) {
+	console.log('2',data)
+}, function (data) {
+	console.log('2',data)
+})
+// p4.catch(function (e) {
+// 	console.log(e)
+// }).then(function () {
+// 	console.log('not reject')
+// },function () {
+// 	console.log('isrejected')
+// })
 // MPromise.all([p,p2,p3]).then(function (val) {
 // 	console.log('resove',val)
 // }, function (data) {
